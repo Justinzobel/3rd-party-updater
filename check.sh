@@ -3,11 +3,14 @@
 # Author: Justin (justin@solus-project.com
 # Licensed under WTFPL
 
-# Require root for updating packages
-if [[ "${EUID}" -ne 0 ]]; then
-  echo "Must be root to use this function"
-  exit 1
-fi
+# Notices and Errors
+function do_error {
+    echo -e "\e[31mError\e[0m: $1"
+    exit 1
+}
+function do_notice {
+    echo -e "\e[93mNotice\e[0m: $1"
+}
 
 # Use a tmp dir for all work to keep it clean
 if [[ ! -d /tmp/3rd-party-updater ]]; then
@@ -26,7 +29,7 @@ for package in $packages
         installed=$(eopkg li | grep $package | wc -l)
         if [[ $installed -eq 1 ]]
             then
-                echo "Checking for updates for ${package}..."
+                do_notice "Checking for updates for ${package}..."
                 case ${package} in
                     google-chrome-stable)
                         url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-stable/pspec.xml"
@@ -58,13 +61,14 @@ for package in $packages
                 installedrelno=$(eopkg info ${package} | head -n 2 | tail -n 1 | cut -d":" -f 4 | sed 's/ //g')
                 if [[ $relno -gt $installedrelno ]]
                     then
-                        echo Updating ${package} to release number ${relno}.
-                        sudo eopkg bi --ignore-safety ${url}
-                        sudo eopkg it *.eopkg
+                        do_notice "Updating ${package} to release number ${relno}. You will need to enter your password."
+                        sudo eopkg bi --ignore-safety ${url} &&
+                        sudo eopkg it *.eopkg &&
                         # Move the eopkg to the cache
-                        sudo mv *.eopkg /var/cache/eopkg/packages/
+                        sudo mv *.eopkg /var/cache/eopkg/packages/ &&
+                        do_notice "{package} cached in /var/cache/eopkg/packages/."
                     else
-                        echo No updates for ${package}
+                        do_notice "No updates for ${package}"
                 fi
                 if [[ -f pspec.xml ]];then rm pspec.xml;fi
         fi
