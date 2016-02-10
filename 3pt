@@ -1,0 +1,230 @@
+#!/bin/bash
+# 3rd party repository management tool
+# Author: Justin (justin@solus-project.com)
+# Licensed under WTFPL
+
+# Notices and Errors
+function do_error {
+    echo -e "\e[31mError\e[0m: $1"
+    exit 1
+}
+function do_notice {
+    echo -e "\e[93mNotice\e[0m: $1"
+}
+
+function do_listavailable {
+	do_notice "Available apps"
+	echo "google-chrome-stable - Google Chrome Browser (Stable)"
+	echo "google-chrome-beta - Google Chrome Browser (Beta)"
+	echo "google-chrome-unstable - Google Chrome Browser (Dev/Unstable)"
+	echo "opera-stable - Opera Browser"
+	echo "vivaldi-beta - Vivaldi Browser"
+	echo "vivaldi-snapshot - Vivalid Browser (Release Snapshot)"
+	echo "spotify - Spotify Music Client"
+}
+
+function do_listinstalled {
+	# List installed 3rd party apps.
+    do_notice "Checking what packages are installed..."
+    eopkg li | cut -d" " -f 1 | grep 'google-chrome-stable\|google-chrome-beta\|google-chrome-unstable\|opera-stable\|vivaldi-beta\|vivaldi-snapshot\|spotify' > /tmp/3rd-party-updater/installed
+    # Exit if nothing found
+    if [[ $(cat /tmp/3rd-party-updater/installed | wc -l) -eq 0 ]];then do_error "No 3rd party applicatins installed.";fi
+    # Do the updates.
+    do_notice "3rd party packages located on the system:"
+    cat /tmp/3rd-party-updater/installed
+}
+
+function do_upgrade {
+    # Upgrades any installed 3rd party apps.
+    # Get a list of what's installed so we don't have to do it more times later
+    do_notice "Checking what packages are installed..."
+    eopkg li | cut -d" " -f 1 | grep 'google-chrome-stable\|google-chrome-beta\|google-chrome-unstable\|opera-stable\|vivaldi-beta\|vivaldi-snapshot\|spotify' > /tmp/3rd-party-updater/installed
+    # Exit if nothing found
+    if [[ $(cat /tmp/3rd-party-updater/installed | wc -l) -eq 0 ]];then do_error "No 3rd party applicatins installed.";fi
+    # Do the updates.
+    do_notice "3rd party packages located on the system:"
+    cat /tmp/3rd-party-updater/installed
+    do_notice "Checking which packages need upgrading..."
+    for package in $(cat /tmp/3rd-party-updater/installed)
+        do
+            case ${package} in
+                google-chrome-stable)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-stable/pspec.xml"
+                ;;
+                google-chrome-beta)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-beta/pspec.xml"
+                ;;
+                google-chrome-unstable)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-unstable/pspec.xml"
+                ;;
+                opera-stable)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/opera-stable/pspec.xml"
+                ;;
+                vivaldi-beta)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-beta/pspec.xml"
+                ;;
+                vivaldi-snapshot)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-snapshot/pspec.xml"
+                ;;
+                spotify)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/multimedia/music/spotify/pspec.xml"
+                ;;
+                *)
+                    echo "wut?!"
+                ;;
+            esac
+            wget -q $url
+            relno=$(cat pspec.xml | grep "<Update release=" | head -n 1 | cut -d"\"" -f 2)
+            installedrelno=$(eopkg info ${package} | head -n 2 | tail -n 1 | cut -d":" -f 4 | sed 's/ //g')
+            if [[ $relno -gt $installedrelno ]]
+                then
+                    do_notice "Upgrading ${package} to release number $relno"
+                    sudo eopkg bi --ignore-safety ${url} && sudo eopkg it *.eopkg && sudo rm *.eopkg &&
+                    do_notice "Done."
+                else
+					do_notice "No new version for ${package}."
+            fi
+            # Cleanup dir
+            rm -rf *
+    done
+}
+
+function do_daemon {
+    notifier &
+}
+
+function notifier {
+    while :
+        do
+            # Finds upgrades for any installed 3rd party apps and notifies
+            # Get a list of what's installed so we don't have to do it more times later
+            eopkg li | cut -d" " -f 1 | grep 'google-chrome-stable\|google-chrome-beta\|google-chrome-unstable\|opera-stable\|vivaldi-beta\|vivaldi-snapshot\|spotify' > /tmp/3rd-party-updater/installed
+            # Exit if nothing found
+            if [[ $(cat /tmp/3rd-party-updater/installed | wc -l) -eq 0 ]];then do_error "No 3rd party applicatins installed.";fi
+            # Do the updates.
+            for package in $(cat /tmp/3rd-party-updater/installed)
+                do
+                    case ${package} in
+                        google-chrome-stable)
+                            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-stable/pspec.xml"
+                        ;;
+                        google-chrome-beta)
+                            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-beta/pspec.xml"
+                        ;;
+                        google-chrome-unstable)
+                            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-unstable/pspec.xml"
+                        ;;
+                        opera-stable)
+                            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/opera-stable/pspec.xml"
+                        ;;
+                        vivaldi-beta)
+                            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-beta/pspec.xml"
+                        ;;
+                        vivaldi-snapshot)
+                            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-snapshot/pspec.xml"
+                        ;;
+                        spotify)
+                                url="https://raw.githubusercontent.com/solus-project/3rd-party/master/multimedia/music/spotify/pspec.xml"
+                        ;;
+                        *)
+                            echo "wut?!"
+                        ;;
+                    esac
+                    wget -q $url
+                    relno=$(cat pspec.xml | grep "<Update release=" | head -n 1 | cut -d"\"" -f 2)
+                    installedrelno=$(eopkg info ${package} | head -n 2 | tail -n 1 | cut -d":" -f 4 | sed 's/ //g')
+                    if [[ $relno -gt $installedrelno ]]
+                        then
+                            notify-send --expire-time=5000 --icon=system-software-install "A new version of ${package} is out." "Open your terminal and execute 3pt upgrade to upgrade."
+                    fi
+                    # Cleanup dir
+                    rm -rf *
+            done
+            # Sleep 1 hour
+            sleep 3600
+    done
+}
+
+function do_install {
+    package=$*
+    case ${package} in
+        google-chrome-stable)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-stable/pspec.xml"
+        ;;
+        google-chrome-beta)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-beta/pspec.xml"
+        ;;
+        google-chrome-unstable)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-unstable/pspec.xml"
+        ;;
+        opera-stable)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/opera-stable/pspec.xml"
+        ;;
+        vivaldi-beta)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-beta/pspec.xml"
+        ;;
+        vivaldi-snapshot)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-snapshot/pspec.xml"
+        ;;
+        spotify)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/multimedia/music/spotify/pspec.xml"
+        ;;
+        *)
+            echo "wut?!"
+        ;;
+    esac
+    sudo eopkg bi --ignore-safety ${url} && sudo eopkg it *.eopkg && sudo rm *.eopkg &&
+    do_notice "Done."
+    # Cleanup dir
+    sudo rm -rf *
+}
+
+function print_usage {
+  echo -e ""
+  echo -e "${yellow}Usage:${white}"
+  echo -e "install (it) - install an application from the 3rd party repository."
+  echo -e "upgrade (up) - check for upgrades to installed applications."
+  echo -e "remove (rm) - remove an application."
+  echo -e "daemon - start the checking daemon with notifications"
+  echo -e "list-available (la) - list available applications."
+  echo -e "list-installed (li) - list installed applications."
+  echo -e ""
+  echo -e "${yellow}Examples:${white}"
+  echo -e "3pt install google-chrome-stable"
+  echo -e "3pt upgrade"
+}
+
+# Check if our temp dir exists, if not create it.
+if [[ ! -d /tmp/3rd-party-updater ]]; then
+    mkdir /tmp/3rd-party-updater
+fi
+
+# Move to dir for all operations.
+cd /tmp/3rd-party-updater
+
+# Decide what action is taken
+arg="${1}"
+shift
+case ${arg} in
+    install|it)
+        do_install $*
+        ;;
+    upgrade|up)
+        do_upgrade
+        ;;
+    remove|rm)
+        do_remove $*
+        ;;
+    daemon)
+        do_daemon
+        ;;
+    list-installed|li)
+        do_listinstalled
+        ;;
+    list-available|la)
+        do_listavailable
+        ;;
+    *)
+        print_usage
+        ;;
+esac
