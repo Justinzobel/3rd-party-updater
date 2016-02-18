@@ -1,0 +1,205 @@
+#!/bin/bash
+# 3rd party repository management tool
+# Author: Justin (justin@solus-project.com)
+# Licensed under WTFPL
+
+# Notices and Errors
+function do_error {
+    zenity --error --text "$@"
+    main_menu
+}
+function do_notice {
+    zenity --info --text "$@"
+}
+
+function do_listinstalled {
+    do_notice "Getting a list of packages installed, this may take a moment..."
+    # List installed 3rd party apps.
+    eopkg li | cut -d" " -f 1 | grep 'google-chrome-stable\|google-chrome-beta\|google-chrome-unstable\|opera-stable\|vivaldi-beta\|vivaldi-snapshot\|spotify' > /tmp/3rd-party-updater/installed
+    # Exit if nothing found
+    if [[ $(cat /tmp/3rd-party-updater/installed | wc -l) -eq 0 ]];then do_error "No 3rd party applicatins installed.";fi
+    # Do the updates.
+    do_notice "3rd party packages located on the system:\n$(cat /tmp/3rd-party-updater/installed)"
+    main_menu
+}
+
+function do_upgrade {
+    # Upgrades any installed 3rd party apps.
+    # Get a list of what's installed so we don't have to do it more times later
+    do_notice "Getting a list of packages installed, this may take a moment..."
+    eopkg li | cut -d" " -f 1 | grep 'google-chrome-stable\|google-chrome-beta\|google-chrome-unstable\|opera-stable\|vivaldi-beta\|vivaldi-snapshot\|spotify' > /tmp/3rd-party-updater/installed
+    # Exit if nothing found
+    if [[ $(cat /tmp/3rd-party-updater/installed | wc -l) -eq 0 ]];then do_error "No 3rd party applications installed.";fi
+    # Do the updates.
+    for package in $(cat /tmp/3rd-party-updater/installed)
+        do
+            case ${package} in
+                google-chrome-stable)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-stable/pspec.xml"
+                ;;
+                google-chrome-beta)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-beta/pspec.xml"
+                ;;
+                google-chrome-unstable)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-unstable/pspec.xml"
+                ;;
+                opera-stable)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/opera-stable/pspec.xml"
+                ;;
+                vivaldi-beta)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-beta/pspec.xml"
+                ;;
+                vivaldi-snapshot)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-snapshot/pspec.xml"
+                ;;
+                spotify)
+                    url="https://raw.githubusercontent.com/solus-project/3rd-party/master/multimedia/music/spotify/pspec.xml"
+                ;;
+            esac
+            wget -q $url
+            relno=$(cat pspec.xml | grep "<Update release=" | head -n 1 | cut -d"\"" -f 2)
+            installedrelno=$(eopkg info ${package} | head -n 2 | tail -n 1 | cut -d":" -f 4 | sed 's/ //g')
+            if [[ $relno -gt $installedrelno ]]
+                then
+                    do_notice "Upgrading ${package} to release number ${relno}."
+                    sudo eopkg bi --ignore-safety ${url} && sudo eopkg it *.eopkg && sudo rm *.eopkg
+                    do_notice "${package} upgraded to release ${relno}."
+            fi
+            # Cleanup dir
+            rm -rf *
+    done
+    do_notice "Upgrade check complete."
+    main_menu
+}
+
+function do_install {
+    ans=$(zenity --height=250 --width=450 --title="Third Party Tool" --list  --text "Chose an action:" --radiolist  --column "" --column "Option" \
+    TRUE "google-chrome-stable - Google Chrome Browser (Stable)" \
+    FALSE "google-chrome-beta - Google Chrome Browser (Beta)" \
+    FALSE "google-chrome-unstable - Google Chrome Browser (Dev/Unstable)" \
+    FALSE "opera-stable - Opera Browser" \
+    FALSE "vivaldi-beta - Vivaldi Browser" \
+    FALSE "vivaldi-snapshot - Vivalid Browser (Release Snapshot)" \
+    FALSE "spotify - Spotify Music Client")
+    package=$(echo $ans | cut -d" " -f 1)
+    case ${package} in
+        google-chrome-stable)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-stable/pspec.xml"
+        ;;
+        google-chrome-beta)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-beta/pspec.xml"
+        ;;
+        google-chrome-unstable)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-unstable/pspec.xml"
+        ;;
+        opera-stable)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/opera-stable/pspec.xml"
+        ;;
+        vivaldi-beta)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-beta/pspec.xml"
+        ;;
+        vivaldi-snapshot)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-snapshot/pspec.xml"
+        ;;
+        spotify)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/multimedia/music/spotify/pspec.xml"
+        ;;
+    esac
+    sudo eopkg bi --ignore-safety ${url} && sudo eopkg it *.eopkg && sudo rm *.eopkg
+    do_notice "${package} installed."
+    # Cleanup dir
+    sudo rm -rf *
+    main_menu
+}
+
+function do_remove {
+    do_notice "Getting a list of packages installed, this may take a moment..."
+    # List installed 3rd party apps.
+    eopkg li | cut -d" " -f 1 | grep 'google-chrome-stable\|google-chrome-beta\|google-chrome-unstable\|opera-stable\|vivaldi-beta\|vivaldi-snapshot\|spotify' > /tmp/3rd-party-updater/installed
+    # Exit if nothing found
+    if [[ $(cat /tmp/3rd-party-updater/installed | wc -l) -eq 0 ]];then do_error "No 3rd party applicatins installed.";fi
+    sed -i 's/^/FALSE /' /tmp/3rd-party-updater/installed
+    ans=$(zenity --height=225 --width=300 --title="Third Party Tool" --list  --text "Select application to remove:" --radiolist  --column "" --column "Option" \
+    $(cat /tmp/3rd-party-updater/installed))
+    package=$(echo $ans | cut -d" " -f 1)
+    case ${package} in
+        google-chrome-stable)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-stable/pspec.xml"
+        ;;
+        google-chrome-beta)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-beta/pspec.xml"
+        ;;
+        google-chrome-unstable)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/google-chrome-unstable/pspec.xml"
+        ;;
+        opera-stable)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/opera-stable/pspec.xml"
+        ;;
+        vivaldi-beta)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-beta/pspec.xml"
+        ;;
+        vivaldi-snapshot)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/network/web/browser/vivaldi-snapshot/pspec.xml"
+        ;;
+        spotify)
+            url="https://raw.githubusercontent.com/solus-project/3rd-party/master/multimedia/music/spotify/pspec.xml"
+        ;;
+    esac
+    pkexec eopkg rm ${package}
+    do_notice "${package} removed."
+    main_menu
+}
+
+function main_menu {
+    ans=$(zenity --height=225 --width=300 --title="Third Party Tool" --list --text "Chose an action:" --radiolist  --column "" --column "Option" \
+    TRUE "Install an application" \
+    FALSE "Upgrade installed applications" \
+    FALSE "Remove an installed application" \
+    FALSE "List installed applications" \
+    FALSE "Exit")
+    case ${ans} in
+        "Install an application")
+            do_install
+        ;;
+        "Upgrade installed applications")
+            do_upgrade
+        ;;
+        "Remove an installed application")
+            do_remove
+        ;;
+        "List installed applications")
+            do_listinstalled
+        ;;
+        "Exit")
+            exit 0
+        ;;
+    esac
+}
+
+function check_zenity {
+    if [[ ! -f /usr/bin/zenity ]]
+        then
+            echo "Zenity not installed, installing..."
+            sudo eopkg it zenity
+    fi
+}
+
+# Check if our temp dir exists, if not create it.
+if [[ ! -d /tmp/3rd-party-updater ]]; then
+    mkdir /tmp/3rd-party-updater
+fi
+
+# Move to dir for all operations.
+cd /tmp/3rd-party-updater
+
+# Get super user perms
+if [ $(which pkexec) ]; then
+    pkexec echo
+else
+    do_notice "This tool needs elevated permissions to run, exiting."
+    exit 1
+fi
+
+
+check_zenity
+main_menu
