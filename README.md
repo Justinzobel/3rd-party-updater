@@ -12,3 +12,4 @@ Daemon launches a background process to monitor for updates hourly.
 
 ## Installation
     sudo wget https://raw.githubusercontent.com/Justinzobel/3rd-party-updater/master/3pt -O /usr/bin/3pt
+    sudo chmod +x /usr/bin/3pt*
